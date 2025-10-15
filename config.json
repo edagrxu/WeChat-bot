@@ -1,0 +1,12 @@
+{
+    "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=fb423ca8-f5b0-453e-ab98-68bcc76014a5",
+    "push_frequency": "\u6cd5\u5b9a\u5de5\u4f5c\u65e5",
+    "push_times": [
+        "09:00",
+        "18:00"
+    ],
+    "next_push_time": "\u672a\u8bbe\u7f6e",
+    "total_pushes": 4,
+    "success_pushes": 3,
+    "push_template": "\u63d0\u9192\u63d0\u9192\u63d0\u9192"
+}

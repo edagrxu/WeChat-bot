@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业微信日报提醒机器人配置</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 苹果磨砂玻璃效果 */
+        .glass-container {
+            backdrop-filter: blur(10px) saturate(180%);
+            -webkit-backdrop-filter: blur(10px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(209, 213, 219, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        /* 移动端安全区域适配 */
+        body {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-500 min-h-screen p-4">
+
+    <div class="max-w-xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white pt-4">🤖 提醒机器人配置</h1>
+
+        <div id="status-monitor" class="glass-container p-5 space-y-3">
+            <h2 class="text-xl font-semibold dark:text-gray-900">🔧 状态监控</h2>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>系统状态: <span id="sys-status" class="font-bold text-green-600">运行中</span></div>
+                <div>下次推送: <span id="next-push" class="font-bold">N/A</span></div>
+                <div>总推送次数: <span id="total-pushes" class="font-bold">0</span></div>
+                <div>成功率: <span id="success-rate" class="font-bold">N/A</span></div>
+            </div>
+        </div>
+
+        <div class="glass-container p-5 space-y-4">
+            <h2 class="text-xl font-semibold dark:text-gray-900">⚙️ 企业微信机器人设置</h2>
+            <label class="block">
+                <span class="text-sm font-medium dark:text-gray-900">Webhook URL</span>
+                <input type="url" id="webhook-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 dark:bg-white/80" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx">
+            </label>
+            <button onclick="testConnection()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                测试连接
+            </button>
+        </div>
+
+        <div class="glass-container p-5 space-y-4">
+            <h2 class="text-xl font-semibold dark:text-gray-900">🗓️ 推送计划设置</h2>
+            
+            <label class="block">
+                <span class="text-sm font-medium dark:text-gray-900">推送频率选项</span>
+                <select id="push-frequency" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 dark:bg-white/80">
+                    <option value="关闭自动推送">关闭自动推送 (仅手动)</option>
+                    <option value="每日推送">每日推送</option>
+                    <option value="法定工作日">法定工作日 (周一至周五，法定节假日除外)</option>
+                    <option value="每周推送">每周推送 (每周一)</option>
+                    <option value="每月推送">每月推送 (每月1号)</option>
+                </select>
+            </label>
+
+            <div id="push-times-container" class="space-y-2">
+                <span class="text-sm font-medium dark:text-gray-900 block">推送时间 (HH:MM)</span>
+                </div>
+            <button onclick="addTimeInput()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded transition duration-200 mt-2">
+                + 添加推送时间
+            </button>
+
+            <button onclick="saveConfig()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded transition duration-200 mt-4">
+                保存配置并启动自动推送
+            </button>
+        </div>
+
+        <div class="glass-container p-5">
+            <h2 class="text-xl font-semibold dark:text-gray-900">🚀 手动推送</h2>
+            <button id="manual-push-btn" onclick="manualPush()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded transition duration-200 mt-4">
+                立即推送
+            </button>
+        </div>
+
+        <div class="glass-container p-5">
+            <h2 class="text-xl font-semibold dark:text-gray-900">📝 推送模板</h2>
+            <div id="template-display" class="text-sm text-gray-700 dark:text-gray-900 mb-3">未设置推送模板。</div>
+            <button id="edit-template-btn" onclick="openTemplateEditor()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                编辑模板
+            </button>
+
+            <div id="template-editor" class="hidden mt-3">
+                <label class="block">
+                    <span class="text-sm font-medium dark:text-gray-900">模板内容（支持简单文本/Markdown）</span>
+                    <textarea id="template-textarea" class="mt-1 block w-full h-40 rounded-md border-gray-300 shadow-sm p-2 dark:bg-white/80" placeholder="在这里输入推送模板..."></textarea>
+                </label>
+                <div class="flex space-x-2 mt-2">
+                    <button onclick="saveTemplate()" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">保存模板</button>
+                    <button onclick="closeTemplateEditor()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="push-history" class="glass-container p-5 space-y-3 mb-8">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-semibold dark:text-gray-900">📋 推送历史</h2>
+                <button onclick="fetchHistory()" class="text-sm text-blue-500 hover:text-blue-700">🔄 刷新</button>
+            </div>
+            <ul id="history-list" class="space-y-2">
+                </ul>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchConfig();
+            fetchStatus();
+            fetchHistory();
+        });
+
+        const timeContainer = document.getElementById('push-times-container');
+
+        // --- 时间输入框管理 ---
+        function addTimeInput(value = '') {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex space-x-2 items-center';
+            
+            const input = document.createElement('input');
+            input.type = 'time';
+            input.className = 'flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 dark:bg-white/80';
+            input.value = value;
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.className = 'text-red-500 hover:text-red-700 p-2 transition duration-200';
+            deleteBtn.onclick = () => {
+                if (timeContainer.children.length > 1) {
+                    timeContainer.removeChild(wrapper);
+                } else {
+                    alert('至少保留一个推送时间点！');
+                }
+            };
+
+            wrapper.appendChild(input);
+            wrapper.appendChild(deleteBtn);
+            timeContainer.appendChild(wrapper);
+        }
+
+        // --- API 交互函数 ---
+        async function fetchConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                document.getElementById('webhook-url').value = config.webhook_url || '';
+                document.getElementById('push-frequency').value = config.push_frequency || '每日推送';
+                // 显示模板内容
+                const tpl = config.push_template || '';
+                if (tpl) {
+                    document.getElementById('template-display').textContent = tpl;
+                } else {
+                    document.getElementById('template-display').textContent = '未设置推送模板。';
+                }
+                
+                timeContainer.innerHTML = ''; // 清空旧的
+                if (config.push_times && config.push_times.length > 0) {
+                    config.push_times.forEach(time => addTimeInput(time));
+                } else {
+                    addTimeInput('09:00'); // 默认一个时间
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        async function saveConfig() {
+            const times = Array.from(timeContainer.querySelectorAll('input[type="time"]')).map(input => input.value).filter(v => v);
+            const newConfig = {
+                webhook_url: document.getElementById('webhook-url').value,
+                push_frequency: document.getElementById('push-frequency').value,
+                push_times: times,
+                push_template: document.getElementById('template-textarea') ? document.getElementById('template-textarea').value : undefined
+            };
+            
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(newConfig)
+                });
+                const result = await response.json();
+                alert(result.message);
+                fetchStatus(); // 更新状态
+            } catch (error) {
+                alert('保存配置失败，请检查网络或后端服务');
+            }
+        }
+
+        async function manualPush() {
+            document.getElementById('manual-push-btn').disabled = true;
+            document.getElementById('manual-push-btn').textContent = '推送中...';
+            try {
+                const response = await fetch('/api/push/manual', { method: 'POST' });
+                const result = await response.json();
+                alert(result.message);
+                fetchStatus();
+                fetchHistory();
+            } catch (error) {
+                alert('手动推送失败，请检查配置和网络');
+            } finally {
+                document.getElementById('manual-push-btn').disabled = false;
+                document.getElementById('manual-push-btn').textContent = '立即推送';
+            }
+        }
+
+        // --- 模板编辑相关 ---
+        function openTemplateEditor() {
+            const editor = document.getElementById('template-editor');
+            const textarea = document.getElementById('template-textarea');
+            const display = document.getElementById('template-display');
+            textarea.value = display.textContent === '未设置推送模板。' ? '' : display.textContent;
+            editor.classList.remove('hidden');
+        }
+
+        function closeTemplateEditor() {
+            document.getElementById('template-editor').classList.add('hidden');
+        }
+
+        async function saveTemplate() {
+            const tpl = document.getElementById('template-textarea').value;
+            // 简单本地更新显示并提交到 saveConfig
+            document.getElementById('template-display').textContent = tpl || '未设置推送模板。';
+            closeTemplateEditor();
+            // 调用保存配置以便后端持久化模板
+            await saveConfig();
+        }
+
+        async function testConnection() {
+            const webhookUrl = document.getElementById('webhook-url').value;
+            if (!webhookUrl) {
+                alert('请先填写 Webhook URL');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/test-connection', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ webhook_url: webhookUrl })
+                });
+                const result = await response.json();
+                if (response.ok && result.status === 'success') {
+                    alert(result.message || '连接测试成功！');
+                } else {
+                    alert(result.message || '连接测试失败，请检查 Webhook URL 和服务器的网络连通性。');
+                }
+            } catch (error) {
+                alert('测试连接失败（前端请求错误），请检查后端服务是否可用');
+            }
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                document.getElementById('sys-status').textContent = status.status ? '运行中' : '已停止';
+                document.getElementById('next-push').textContent = status.next_push_time;
+                document.getElementById('total-pushes').textContent = status.total_pushes;
+                document.getElementById('success-rate').textContent = status.success_rate;
+            } catch (error) {
+                console.error('获取状态失败:', error);
+                document.getElementById('sys-status').textContent = '连接失败';
+            }
+            // 每 5 秒刷新一次状态
+            setTimeout(fetchStatus, 5000); 
+        }
+
+        async function fetchHistory() {
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                const historyList = document.getElementById('history-list');
+                historyList.innerHTML = '';
+                
+                if (data.history.length === 0) {
+                    historyList.innerHTML = '<li class="text-sm text-gray-500">暂无推送历史记录。</li>';
+                    return;
+                }
+
+                data.history.forEach(record => {
+                    const listItem = document.createElement('li');
+                    const statusColor = record.status === '成功' ? 'text-green-600' : 'text-red-600';
+                    listItem.className = `p-2 rounded-md ${record.status === '成功' ? 'bg-green-100/50' : 'bg-red-100/50'} text-sm dark:text-gray-900`;
+                    listItem.innerHTML = `
+                        <div class="font-bold">${record.time} (${record.type})</div>
+                        <div class="ml-2">状态: <span class="${statusColor}">${record.status}</span></div>
+                        <div class="ml-2 text-xs text-gray-700 truncate">信息: ${record.message}</div>
+                    `;
+                    historyList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('获取历史记录失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>

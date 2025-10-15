@@ -1,0 +1,12 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:2029
+ * Running on http://10.0.16.8:2029
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [15/Oct/2025 17:58:26] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2025 17:58:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2025 17:58:27] "GET /api/config HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2025 17:58:27] "GET /api/status HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2025 17:58:27] "GET /api/history HTTP/1.1" 200 -
