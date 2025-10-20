@@ -5,10 +5,19 @@ from jinja2 import Template
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import datetime
+from zoneinfo import ZoneInfo
 import os
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
+
+# 优先使用 chinese_calendar 判断中国法定节假日。如果不可用，回退到简单的周一至周五判断。
+try:
+    import chinese_calendar as cc
+    HAS_CHINESE_CALENDAR = True
+except Exception:
+    cc = None
+    HAS_CHINESE_CALENDAR = False
 
 # --- 存储和配置 ---
 CONFIG_FILE = 'config.json'
@@ -95,20 +104,34 @@ def add_push_history(status, message, push_type):
 def scheduled_push_job():
     """定时任务执行的推送逻辑"""
     global CONFIG
-    
-    # 检查当前时间是否在推送时间列表中
-    now_time_str = datetime.datetime.now().strftime("%H:%M")
+    # 使用北京时区（Asia/Shanghai）作为推送时间基准
+    now = datetime.datetime.now(ZoneInfo('Asia/Shanghai'))
+    now_time_str = now.strftime("%H:%M")
     if now_time_str not in CONFIG.get('push_times', []):
         return
 
-    # 检查是否是周推或月推
-    today = datetime.date.today()
+    # 检查是否是周/月/法定工作日推送
+    today = now.date()
     frequency = CONFIG.get('push_frequency')
-    
-    if frequency == "每周推送" and today.weekday() != 0: # 0 for Monday
-        return
-    if frequency == "每月推送" and today.day != 1: # 1 for 1st of the month
-        return
+
+    # 法定工作日：优先使用 chinese_calendar 库判断节假日，否则退化为工作日为周一~周五
+    if frequency == "法定工作日":
+        if HAS_CHINESE_CALENDAR:
+            # chinese_calendar.is_workday 返回 True 表示为工作日
+            if not cc.is_workday(today):
+                return
+        else:
+            # 没有库时退化为周一(0)-周五(4)为工作日
+            if today.weekday() >= 5:
+                return
+
+    if frequency == "每周推送":
+        # 这里按周一(0)推送，若需要其它规则可扩展
+        if today.weekday() != 0:
+            return
+    if frequency == "每月推送":
+        if today.day != 1:
+            return
 
     # 执行推送
     status, message = send_wechat_message(
@@ -164,17 +187,28 @@ def handle_config():
     elif request.method == 'POST':
         # POST 请求保存配置
         data = request.json
-        
+
         # 简单校验
         if not data.get('webhook_url'):
             return jsonify({"status": "error", "message": "Webhook URL 不能为空"}), 400
 
-        CONFIG.update(data)
-        
+        # 只在 webhook_url/push_frequency/push_times/push_template 等字段存在时更新
+        # 防止空的 push_template 覆盖已有模板
+        if 'webhook_url' in data:
+            CONFIG['webhook_url'] = data['webhook_url']
+        if 'push_frequency' in data:
+            CONFIG['push_frequency'] = data['push_frequency']
+        if 'push_times' in data:
+            CONFIG['push_times'] = data['push_times']
+        # 仅在传入模板为非空字符串时才覆盖
+        if 'push_template' in data and isinstance(data['push_template'], str):
+            if data['push_template'].strip() != '':
+                CONFIG['push_template'] = data['push_template']
+
         # 清洗推送时间（移除空值并排序）
-        times = [t.strip() for t in CONFIG['push_times'] if t.strip()]
+        times = [t.strip() for t in CONFIG.get('push_times', []) if t.strip()]
         CONFIG['push_times'] = sorted(list(set(times)))
-        
+
         save_config()
         start_scheduler() # 配置更新后重启调度器
         return jsonify({"status": "success", "message": "配置保存成功"})
