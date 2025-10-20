@@ -154,12 +154,16 @@
                 
                 document.getElementById('webhook-url').value = config.webhook_url || '';
                 document.getElementById('push-frequency').value = config.push_frequency || '每日推送';
-                // 显示模板内容
+                // 显示模板内容并同步到隐藏的编辑器 textarea（如果存在）
                 const tpl = config.push_template || '';
+                const displayEl = document.getElementById('template-display');
+                const textarea = document.getElementById('template-textarea');
                 if (tpl) {
-                    document.getElementById('template-display').textContent = tpl;
+                    displayEl.textContent = tpl;
+                    if (textarea) textarea.value = tpl;
                 } else {
-                    document.getElementById('template-display').textContent = '未设置推送模板。';
+                    displayEl.textContent = '未设置推送模板。';
+                    if (textarea) textarea.value = '';
                 }
                 
                 timeContainer.innerHTML = ''; // 清空旧的
@@ -175,11 +179,16 @@
 
         async function saveConfig() {
             const times = Array.from(timeContainer.querySelectorAll('input[type="time"]')).map(input => input.value).filter(v => v);
+            // 如果模板编辑器没有打开，避免传 undefined 覆盖后端已有模板；优先取 textarea 的值（用户编辑时），否则取展示区的文本。
+            const displayTpl = document.getElementById('template-display').textContent;
+            const textareaEl = document.getElementById('template-textarea');
+            const tplToSend = textareaEl ? textareaEl.value : (displayTpl === '未设置推送模板。' ? '' : displayTpl);
+
             const newConfig = {
                 webhook_url: document.getElementById('webhook-url').value,
                 push_frequency: document.getElementById('push-frequency').value,
                 push_times: times,
-                push_template: document.getElementById('template-textarea') ? document.getElementById('template-textarea').value : undefined
+                push_template: tplToSend
             };
             
             try {
